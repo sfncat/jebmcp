@@ -288,56 +288,31 @@ def ping():
     return "pong"
 
 def getOrLoadApk(filepath):
-    try:
-        engctx = CTX.getEnginesContext()
-        if not engctx:
-            print('Back-end engines not initialized')
-            return None
+    engctx = CTX.getEnginesContext()
 
-        if not os.path.exists(filepath):
-            raise Exception("File not found: %s" % filepath)
+    if not engctx:
+        print('Back-end engines not initialized')
+        return
 
-        # Create a project
-        project = engctx.loadProject('MCPPluginProject')
-        if not project:
-            print('Failed to load project')
-            return None
-
-        base_name = os.path.basename(filepath)
-        correspondingArtifact = None
-        
-        # Check if artifact is already loaded
-        for artifact in project.getLiveArtifacts():
-            if artifact.getArtifact().getName() == base_name:
-                correspondingArtifact = artifact
-                break
-
-        # Load artifact if not already loaded
-        if not correspondingArtifact:
-            try:
-                correspondingArtifact = project.processArtifact(Artifact(base_name, FileInput(File(filepath))))
-            except Exception as e:
-                print('Failed to process artifact: %s' % str(e))
-                return None
-
-        if not correspondingArtifact:
-            print('No artifact created')
-            return None
-
-        unit = correspondingArtifact.getMainUnit()
-        if not unit:
-            print('No main unit found')
-            return None
-
-        if isinstance(unit, IApkUnit):
-            return unit
-
-        print('Main unit is not an APK unit')
-        return None
-
-    except Exception as e:
-        print('Error in getOrLoadApk: %s' % str(e))
-        return None
+    if not os.path.exists(filepath):
+        raise Exception("File not found: %s" % filepath)
+    # Create a project
+    project = engctx.loadProject('MCPPluginProject')
+    base_name = os.path.basename(filepath)
+    correspondingArtifact = None
+    for artifact in project.getLiveArtifacts():
+        if artifact.getArtifact().getName() == base_name:
+            # If the artifact is already loaded, return it
+            correspondingArtifact = artifact
+            break
+    if not correspondingArtifact:
+        correspondingArtifact = project.processArtifact(Artifact(base_name, FileInput(File(filepath))))
+    
+    unit = correspondingArtifact.getMainUnit()
+    if isinstance(unit, IApkUnit):
+            # If the unit is already loaded, return it
+            return unit    
+    return None
 
 @jsonrpc
 def get_manifest(filepath):
@@ -412,16 +387,13 @@ def get_class_decompiled_code(filepath, class_signature):
     
     codeUnit = apk.getDex()
     clazz = codeUnit.getClass(class_signature)
-    if clazz is None:
-        raise Exception("Class not found: %s" % class_signature)
-        
     decomp = DecompilerHelper.getDecompiler(codeUnit)
     if not decomp:
         print('Cannot acquire decompiler for unit: %s' % decomp)
         return
 
     if not decomp.decompileClass(clazz.getSignature()):
-        print('Failed decompiling class')
+        print('Failed decompiling method')
         return
 
     text = decomp.getDecompiledClassText(clazz.getSignature())
